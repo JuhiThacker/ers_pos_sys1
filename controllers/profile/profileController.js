@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const { UPLOAD_DIR } = require('../../middleware/upload.js');
 
-// ---------- Helpers ----------
 const PROFILE_QUERY = `
   SELECT
     u.username,
