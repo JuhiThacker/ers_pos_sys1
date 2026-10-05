@@ -3,11 +3,11 @@ const express = require('express');
 const {
     getEmployee,
     changePassword
-} = require('../controllers/employeeController.js');
+} = require('../controller/employeeController.js');
 
 const {
     getProfile
-} = require('../controllers/profile/profileController.js');
+} = require('../controller/profile/profileController.js');
 
 const {
     authentication

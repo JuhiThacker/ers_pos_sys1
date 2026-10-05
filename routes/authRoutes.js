@@ -4,7 +4,7 @@ const {
     login,
     me,
     logout
-} = require('../controllers/auth/authController.js');
+} = require('../controller/auth/authController.js');
 
 const {
     authentication
