@@ -1,46 +1,128 @@
 require('dotenv').config();
+
 const express = require('express');
-const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const path = require('path');
-const profileRoutes = require('./modules/profile/profileRoutes');
+const cookieParser = require('cookie-parser');
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/profile', profileRoutes);
-app.get('/profile', (req, res) => res.sendFile(path.join(__dirname, 'views', 'profile.html')));
-const authRoutes = require('./modules/auth/authRoutes');
+const authRoutes = require('./routes/authRoutes');
+const employeeRoutes = require('./routes/employeeRoutes');
+const companyProfileRoutes = require('./routes/companyProfileRoutes');
 
-const app = express(); 
+const app = express();
 
-const isLocalNetworkOrigin = (origin) => {
-  try {
-    const { hostname } = new URL(origin);
-    return (
-      hostname === 'localhost' ||
-      hostname === '127.0.0.1' ||
-      /^10\./.test(hostname) ||
-      /^192\.168\./.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
-    );
-  } catch {
-    return false;
-  }
-};
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // No origin means Postman, curl, or a same-origin request
-    if (!origin || isLocalNetworkOrigin(origin)) return callback(null, true);
-    callback(null, false);
-  },
-  credentials: true,
-}));
+// ==========================================
+// MIDDLEWARE
+// ==========================================
 
+app.use(
+    cors({
+        origin: true,
+        credentials: true
+    })
+);
 
 app.use(express.json());
+
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
+
 app.use(cookieParser());
 
-app.use('/api/auth', authRoutes);
+
+// ==========================================
+// ROUTES
+// ==========================================
+
+app.use(
+    '/api/auth',
+    authRoutes
+);
+
+app.use(
+    '/api/employees',
+    employeeRoutes
+);
+
+app.use(
+    '/api/company-profile',
+    companyProfileRoutes
+);
+
+
+// ==========================================
+// TEST ROUTES
+// ==========================================
+
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'POS System Backend is Running'
+    });
+});
+
+app.get('/api', (req, res) => {
+    res.json({
+        success: true,
+        message: 'POS API is Working'
+    });
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Server is healthy'
+    });
+});
+
+
+// ==========================================
+// 404
+// ==========================================
+
+app.use((req, res) => {
+
+    res.status(404).json({
+        success: false,
+        error: `Route ${req.method} ${req.originalUrl} not found.`
+    });
+
+});
+
+
+// ==========================================
+// ERROR HANDLER
+// ==========================================
+
+app.use((err, req, res, next) => {
+
+    console.error('Server Error:', err);
+
+    res.status(500).json({
+        success: false,
+        error: 'Internal server error.'
+    });
+
+});
+
+
+// ==========================================
+// START SERVER
+// ==========================================
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+
+app.listen(
+    PORT,
+    '0.0.0.0',
+    () => {
+
+        console.log(
+            `Server running at http://localhost:${PORT}`
+        );
+
+    }
+);

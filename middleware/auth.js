@@ -1,32 +1,175 @@
-
 const jwt = require('jsonwebtoken');
 
-const authentication = (req, res, next) => {
-  console.log(req.method, req.originalUrl, '| origin:', req.headers.origin, '| auth header:', req.headers.authorization ? 'YES' : 'NO', '| cookie:', req.cookies.token ? 'YES' : 'NO');
-  try {
-    const header = req.headers.authorization;
-    const token =
-      req.cookies.token ||
-      (header && header.startsWith('Bearer ') ? header.slice(7) : null);
 
-    if (!token) {
-      return res.status(401).json({ error: 'Access denied. No token provided.' });
+// ==================================================
+// AUTHENTICATION MIDDLEWARE
+// ==================================================
+
+const authentication = (req, res, next) => {
+
+    try {
+
+        // ------------------------------------------------
+        // Get Authorization Header
+        // ------------------------------------------------
+
+        const authHeader = req.headers.authorization;
+
+
+        if (!authHeader) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                error: 'Authorization header missing.'
+
+            });
+
+        }
+
+
+        // ------------------------------------------------
+        // Expected:
+        //
+        // Authorization: Bearer TOKEN
+        // ------------------------------------------------
+
+        const parts = authHeader.split(' ');
+
+
+        if (
+            parts.length !== 2 ||
+            parts[0] !== 'Bearer' ||
+            !parts[1]
+        ) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                error: 'Invalid authorization format.'
+
+            });
+
+        }
+
+
+        const token = parts[1];
+
+
+        // ------------------------------------------------
+        // Check JWT Secret
+        // ------------------------------------------------
+
+        if (!process.env.JWT_SECRET) {
+
+            console.error(
+                'JWT_SECRET is missing from .env'
+            );
+
+            return res.status(500).json({
+
+                success: false,
+
+                error: 'JWT secret is not configured.'
+
+            });
+
+        }
+
+
+        // ------------------------------------------------
+        // Verify Token
+        // ------------------------------------------------
+
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
+
+
+        // ------------------------------------------------
+        // Store User Information
+        // ------------------------------------------------
+
+        req.user = decoded;
+
+
+        // ------------------------------------------------
+        // Continue
+        // ------------------------------------------------
+
+        next();
+
+
+    } catch (error) {
+
+        console.error(
+            'JWT Error:',
+            error.message
+        );
+
+
+        // ------------------------------------------------
+        // Expired Token
+        // ------------------------------------------------
+
+        if (
+            error.name === 'TokenExpiredError'
+        ) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                error: 'Token expired.'
+
+            });
+
+        }
+
+
+        // ------------------------------------------------
+        // Invalid Token
+        // ------------------------------------------------
+
+        if (
+            error.name === 'JsonWebTokenError'
+        ) {
+
+            return res.status(401).json({
+
+                success: false,
+
+                error: 'Invalid token.'
+
+            });
+
+        }
+
+
+        // ------------------------------------------------
+        // Other Authentication Error
+        // ------------------------------------------------
+
+        return res.status(401).json({
+
+            success: false,
+
+            error: 'Authentication failed.'
+
+        });
+
     }
 
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token.' });
-  }
 };
 
-// Usage: router.post('/sales', authentication, authorize('create_sale'), handler)
-const authorize = (...required) => (req, res, next) => {
-  const has = req.user?.permissions || [];
-  if (!required.every((p) => has.includes(p))) {
-    return res.status(403).json({ error: 'Forbidden. Missing permission.' });
-  }
-  next();
-};
 
-module.exports = { authentication, authorize };
+// ==================================================
+// EXPORT
+// ==================================================
+
+module.exports = {
+    authentication
+};
