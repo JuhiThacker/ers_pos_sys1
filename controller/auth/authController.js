@@ -58,7 +58,7 @@ const login = async (req, res) => {
                 e.id,
                 e.first_name,
                 e.last_name,
-                e.employee_code,
+                e.employee_number,
                 e.username,
                 e.password,
                 e.email,
@@ -142,8 +142,8 @@ const login = async (req, res) => {
 
                 roleId: employee.role_id,
 
-                employeeCode:
-                    employee.employee_code,
+                employee_number:
+                    employee.employee_number,
 
                 username:
                     employee.username
@@ -188,7 +188,7 @@ const login = async (req, res) => {
 
         return res.status(200).json({
 
-            success: true,
+           
 
             message:
                 'Login successfully. Welcome, ' +
@@ -196,35 +196,7 @@ const login = async (req, res) => {
                 ' ' +
                 employee.last_name +
                 '!',
-
-            token,
-
-            employee: {
-
-                id:
-                    employee.id,
-
-                first_name:
-                    employee.first_name,
-
-                last_name:
-                    employee.last_name,
-
-                employee_code:
-                    employee.employee_code,
-
-                username:
-                    employee.username,
-
-                email:
-                    employee.email,
-
-                role_id:
-                    employee.role_id,
-
-                role_name:
-                    employee.role_name
-            }
+            
         });
 
     } catch (error) {
@@ -296,7 +268,7 @@ const me = async (req, res) => {
                 e.id,
                 e.first_name,
                 e.last_name,
-                e.employee_code,
+                e.employee_number,
                 e.username,
                 e.email,
                 e.role_id,

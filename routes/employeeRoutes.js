@@ -6,45 +6,28 @@ const {
 } = require('../controller/employeeController.js');
 
 const {
-    getProfile
-} = require('../controller/profile/profileController.js');
-
-const {
     authentication
 } = require('../middleware/authentication.js');
 
+const checkPermission = require('../middleware/permissionMiddleware');
+
 const router = express.Router();
 
-
-// ==========================================
-// PROFILE
-// ==========================================
-
-router.get(
-    '/profile',
-    authentication,
-    getProfile
-);
-
-
-// ==========================================
 // CHANGE PASSWORD
-// ==========================================
 
 router.patch(
     '/changePassword',
     authentication,
+    checkPermission('employee.edit'),
     changePassword
 );
 
-
-// ==========================================
-// GET EMPLOYEE BY ID
-// ==========================================
+// GET EMPLOYEE
 
 router.get(
     '/:id',
     authentication,
+    checkPermission('employee.view'),
     getEmployee
 );
 

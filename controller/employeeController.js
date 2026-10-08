@@ -2,169 +2,66 @@ const pool = require('../config/db');
 const argon2 = require('argon2');
 
 
-// ==========================================
-// GET EMPLOYEE
-// ==========================================
-
+//getEmployee
 const getEmployee = async (req, res) => {
     try {
-
         const employeeId = req.params.id;
-
-        const [rows] = await pool.query(
-            `
-            SELECT
-                e.first_name,
-                e.last_name,
-                e.username,
-                r.role_name,
-                e.employee_number,
-                e.email,
-                c.phone,
-                e.address,
-                e.city,
-                e.district,
-                e.state,
-                e.country,
-                e.pincode,
-                e.dob,
-                e.joining_date
+        const [rows] = await pool.query(`SELECT
+            e.first_name,
+            e.last_name,
+            e.username,
+            r.role_name,
+            e.employee_number,
+            e.email,
+            c.phone,
+            e.address,
+            e.city,
+            e.district,
+            e.state,
+            e.country,
+            e.pincode,
+            e.dob,
+            e.joining_date
             FROM employees e
-            INNER JOIN roles r
-                ON e.role_id = r.id
-            INNER JOIN contact c
-                ON e.contact_id = c.id
-            WHERE e.id = ?
-            `,
-            [employeeId]
-        );
-
-        return res.status(200).json({
-            success: true,
-            profile: rows
-        });
-
+            INNER JOIN roles r ON e.role_id = r.id
+            INNER JOIN contact c ON e.contact_id = c.id
+            WHERE e.id=?`, [employeeId]);
+        return res.status(200).json({ rows });
     } catch (error) {
-
-        console.error('Get Employee Error:', error);
-
-        return res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return res.status(500).json({ error: error.message });
     }
 };
 
-
-// ==========================================
-// CHANGE PASSWORD
-// ==========================================
-
+//Change password
 const changePassword = async (req, res) => {
-
     try {
 
-        const employeeId = req.user.employeeId;
-
-        const {
-            oldPassword,
-            newPassword
-        } = req.body;
-
+        const employeeId = req.employee.employeeId;
+        const { oldPassword, newPassword } = req.body;
 
         if (!oldPassword || !newPassword) {
-
-            return res.status(400).json({
-                success: false,
-                error:
-                    'Old password and new password are required.'
-            });
+            return res.status(400).json({ message: 'Old password and new password are required.' });
         }
-
-
-        // Get current password hash
-        const [rows] = await pool.query(
-            `
-            SELECT password
-            FROM employees
-            WHERE id = ?
-            `,
-            [employeeId]
-        );
-
+        const [rows] = await pool.query(`SELECT password FROM employees WHERE id=?`, [employeeId]);
 
         if (rows.length === 0) {
-
-            return res.status(404).json({
-                success: false,
-                error: 'Employee not found.'
-            });
+            return res.status(400).json({ message: 'Employee not found.' });
         }
 
-
-        // Verify old password
-        const isMatch = await argon2.verify(
-            rows[0].password,
-            oldPassword
-        );
-
+        const isMatch = await argon2.verify(rows[0].password,oldPassword);
 
         if (!isMatch) {
-
-            return res.status(400).json({
-                success: false,
-                error:
-                    'Old password is incorrect.'
-            });
+            return res.status(400).json({ message: 'Old password is incorrect.' });
         }
 
+        const hashedPassword = await argon2.hash(newPassword);
 
-        // Hash new password
-        const hashedPassword =
-            await argon2.hash(newPassword);
+        await pool.query(`UPDATE employees SET password=? WHERE id=?`, [hashedPassword, employeeId]);
 
-
-        // Update password
-        await pool.query(
-            `
-            UPDATE employees
-            SET password = ?
-            WHERE id = ?
-            `,
-            [
-                hashedPassword,
-                employeeId
-            ]
-        );
-
-
-        return res.status(200).json({
-            success: true,
-            message:
-                'Password changed successfully.'
-        });
-
-
+        return res.status(200).json({ message: 'Password changed successfully.' });
     } catch (error) {
-
-        console.error(
-            'Change Password Error:',
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return res.status(500).json({ error: error.message });
     }
+
 };
-
-
-// ==========================================
-// EXPORT
-// ==========================================
-
-module.exports = {
-    getEmployee,
-    changePassword
-};
+module.exports = { getEmployee, changePassword };

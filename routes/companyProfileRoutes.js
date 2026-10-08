@@ -10,16 +10,56 @@ const {
     deleteCompany
 } = require('../controller/companyProfileController');
 
+const {
+    authentication
+} = require('../middleware/authentication.js');
 
-router.post('/', createCompany);
+const checkPermission = require('../middleware/permissionMiddleware');
 
-router.get('/', getCompanies);
 
-router.get('/:id', getCompanyById);
+// CREATE COMPANY
+router.post(
+    '/',
+    authentication,
+    checkPermission('company.create'),
+    createCompany
+);
 
-router.put('/:id', updateCompany);
 
-router.delete('/:id', deleteCompany);
+// GET ALL COMPANIES
+router.get(
+    '/',
+    authentication,
+    checkPermission('company.view'),
+    getCompanies
+);
+
+
+// GET COMPANY BY ID
+router.get(
+    '/:id',
+    authentication,
+    checkPermission('company.view'),
+    getCompanyById
+);
+
+
+// UPDATE COMPANY
+router.put(
+    '/:id',
+    authentication,
+    checkPermission('company.edit'),
+    updateCompany
+);
+
+
+// DELETE COMPANY
+router.delete(
+    '/:id',
+    authentication,
+    checkPermission('company.delete'),
+    deleteCompany
+);
 
 
 module.exports = router;

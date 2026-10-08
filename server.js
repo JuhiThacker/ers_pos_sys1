@@ -7,13 +7,11 @@ const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const companyProfileRoutes = require('./routes/companyProfileRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 const app = express();
 
-
-// ==========================================
 // MIDDLEWARE
-// ==========================================
 
 app.use(
     cors({
@@ -32,10 +30,7 @@ app.use(
 
 app.use(cookieParser());
 
-
-// ==========================================
 // ROUTES
-// ==========================================
 
 app.use(
     '/api/auth',
@@ -52,10 +47,9 @@ app.use(
     companyProfileRoutes
 );
 
+app.use('/api/roles', roleRoutes);
 
-// ==========================================
 // TEST ROUTES
-// ==========================================
 
 app.get('/', (req, res) => {
     res.json({
@@ -79,9 +73,7 @@ app.get('/api/health', (req, res) => {
 });
 
 
-// ==========================================
 // 404
-// ==========================================
 
 app.use((req, res) => {
 
@@ -92,10 +84,7 @@ app.use((req, res) => {
 
 });
 
-
-// ==========================================
 // ERROR HANDLER
-// ==========================================
 
 app.use((err, req, res, next) => {
 
@@ -108,10 +97,7 @@ app.use((err, req, res, next) => {
 
 });
 
-
-// ==========================================
 // START SERVER
-// ==========================================
 
 const PORT = process.env.PORT || 3000;
 
