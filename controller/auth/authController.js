@@ -156,11 +156,8 @@ const login = async (req, res) => {
                     process.env.JWT_EXPIRES_IN || '1d'
             }
         );
-
-
-        // ------------------------------------------------
+        
         // Store Token In Cookie
-        // ------------------------------------------------
 
         res.cookie(
             'token',
