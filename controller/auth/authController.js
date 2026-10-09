@@ -1,60 +1,30 @@
-const {
-    authValidator
-} = require('../../validator/authValidator.js');
+const { authValidator } = require("../../validator/authValidator.js");
+const pool = require("../../config/db.js");
+const argon2 = require("argon2");
+const jwt = require("jsonwebtoken");
 
-const pool = require('../../config/db.js');
-
-const argon2 = require('argon2');
-
-const jwt = require('jsonwebtoken');
-
-
-// ==================================================
+// ========================================
 // LOGIN
-// ==================================================
-
+// ========================================
 const login = async (req, res) => {
-
     try {
-
-        // ------------------------------------------------
-        // Validate Request
-        // ------------------------------------------------
-
-        const validation =
-            authValidator.safeParse(req.body);
+        // 1. Validate request
+        const validation = authValidator.safeParse(req.body);
 
         if (!validation.success) {
-
-            const errorMessages =
-                validation.error.issues.map(
-                    (err) => err.message
-                );
-
             return res.status(400).json({
                 success: false,
-                error: errorMessages
+                error: validation.error.issues.map(
+                    (issue) => issue.message
+                ),
             });
         }
 
+        const { username, password } = validation.data;
 
-        // ------------------------------------------------
-        // Get Login Data
-        // ------------------------------------------------
-
-        const {
-            username,
-            password
-        } = validation.data;
-
-
-        // ------------------------------------------------
-        // Find Employee By Username
-        // ------------------------------------------------
-
+        // 2. Find employee
         const [rows] = await pool.query(
-            `
-            SELECT
+            `SELECT
                 e.id,
                 e.first_name,
                 e.last_name,
@@ -64,204 +34,107 @@ const login = async (req, res) => {
                 e.email,
                 e.role_id,
                 r.role_name
-
-            FROM employees e
-
-            LEFT JOIN roles r
-                ON r.id = e.role_id
-
-            WHERE e.username = ?
-
-            LIMIT 1
-            `,
+             FROM employees e
+             LEFT JOIN roles r ON r.id = e.role_id
+             WHERE e.username = ?
+             LIMIT 1`,
             [username]
         );
 
-
-        // ------------------------------------------------
-        // Employee Not Found
-        // ------------------------------------------------
-
         if (rows.length === 0) {
-
             return res.status(401).json({
                 success: false,
-                error: 'Invalid username or password.'
+                error: "Invalid username or password.",
             });
         }
-
 
         const employee = rows[0];
 
-
-        // ------------------------------------------------
-        // Verify Password
-        // ------------------------------------------------
-
-        const isMatch =
-            await argon2.verify(
-                employee.password,
-                password
-            );
-
-
-        if (!isMatch) {
-
+        // 3. Verify password
+        if (!employee.password) {
             return res.status(401).json({
                 success: false,
-                error: 'Invalid username or password.'
+                error: "Invalid username or password.",
             });
         }
 
+        const isMatch = await argon2.verify(
+            employee.password,
+            password
+        );
 
-        // ------------------------------------------------
-        // Check JWT Secret
-        // ------------------------------------------------
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                error: "Invalid username or password.",
+            });
+        }
 
+        // 4. Check JWT secret
         if (!process.env.JWT_SECRET) {
-
-            console.error(
-                'JWT_SECRET is missing.'
-            );
+            console.error("JWT_SECRET is not configured.");
 
             return res.status(500).json({
                 success: false,
-                error: 'JWT secret is not configured.'
+                error: "Authentication configuration error.",
             });
         }
 
-
-        // ------------------------------------------------
-        // Create JWT
-        // ------------------------------------------------
-
-        const token = jwt.sign(
-
-            {
-                employeeId: employee.id,
-
-                roleId: employee.role_id,
-
-                employee_number:
-                    employee.employee_number,
-
-                username:
-                    employee.username
-            },
-
-            process.env.JWT_SECRET,
-
-            {
-                expiresIn:
-                    process.env.JWT_EXPIRES_IN || '1d'
-            }
-        );
+        // 5. Create JWT
+      
+const token = jwt.sign(
+    {
+        employeeId: employee.id,
+        roleId: employee.role_id,
+        employee_number: employee.employee_number,
+        username: employee.username
+    },
+    process.env.JWT_SECRET
+);
         
-        // Store Token In Cookie
+        // 6. Set authentication cookie
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: false, // Localhost HTTP development only
+            sameSite: "lax",
+            path: "/",
+        });
 
-        res.cookie(
-            'token',
-            token,
-            {
-                httpOnly: true,
+        console.log("Login successful. Token cookie set.");
 
-                secure:
-                    process.env.NODE_ENV === 'production',
-
-                sameSite:
-                    process.env.NODE_ENV === 'production'
-                        ? 'none'
-                        : 'lax',
-
-                maxAge:
-                    24 * 60 * 60 * 1000
-            }
-        );
-
-
-        // ------------------------------------------------
-        // Login Response
-        // ------------------------------------------------
-
+        // 7. Clean login response
         return res.status(200).json({
-
-           
-
-            message:
-                'Login successfully. Welcome, ' +
-                employee.first_name +
-                ' ' +
-                employee.last_name +
-                '!',
-            
+            success: true,
+            message: `Login successfully. Welcome, ${employee.username}!`,
         });
 
     } catch (error) {
-
-        console.error(
-            '========== LOGIN ERROR =========='
-        );
-
-        console.error(
-            'Message:',
-            error.message
-        );
-
-        console.error(
-            'Stack:',
-            error.stack
-        );
-
-        console.error(
-            '================================='
-        );
+        console.error("LOGIN ERROR:", error.message);
 
         return res.status(500).json({
-
             success: false,
-
-            error:
-                error.message
+            error: "Something went wrong during login.",
         });
     }
 };
 
-
-// ==================================================
-// CURRENT EMPLOYEE
-// ==================================================
-
+// ========================================
+// CURRENT EMPLOYEE (ME)
+// ========================================
 const me = async (req, res) => {
-
     try {
-
-        const employeeId =
-            req.user.employeeId;
-
-
-        // ------------------------------------------------
-        // Check Employee ID
-        // ------------------------------------------------
+        // Authentication middleware must set req.user
+        const employeeId = req.user?.employeeId;
 
         if (!employeeId) {
-
             return res.status(401).json({
-
                 success: false,
-
-                error:
-                    'Employee ID not found in token.'
+                error: "Employee ID not found in token.",
             });
         }
 
-
-        // ------------------------------------------------
-        // Get Employee
-        // ------------------------------------------------
-
         const [rows] = await pool.query(
-            `
-            SELECT
+            `SELECT
                 e.id,
                 e.first_name,
                 e.last_name,
@@ -271,152 +144,70 @@ const me = async (req, res) => {
                 e.role_id,
                 r.role_name,
                 e.profile_image
-
-            FROM employees e
-
-            LEFT JOIN roles r
-                ON r.id = e.role_id
-
-            WHERE e.id = ?
-
-            LIMIT 1
-            `,
+             FROM employees e
+             LEFT JOIN roles r ON r.id = e.role_id
+             WHERE e.id = ?
+             LIMIT 1`,
             [employeeId]
         );
 
-
-        // ------------------------------------------------
-        // Employee Not Found
-        // ------------------------------------------------
-
         if (rows.length === 0) {
-
             return res.status(404).json({
-
                 success: false,
-
-                error:
-                    'Employee not found.'
+                error: "Employee not found.",
             });
         }
 
-
-        // ------------------------------------------------
-        // Response
-        // ------------------------------------------------
-
         return res.status(200).json({
-
             success: true,
-
-            employee: rows[0]
-
+            employee: rows[0],
         });
 
     } catch (error) {
-
-        console.error(
-            '========== ME ERROR =========='
-        );
-
-        console.error(
-            'Message:',
-            error.message
-        );
-
-        console.error(
-            'Stack:',
-            error.stack
-        );
-
-        console.error(
-            '=============================='
-        );
+        console.error("ME ERROR:", error.message);
 
         return res.status(500).json({
-
             success: false,
-
-            error:
-                'Something went wrong.'
+            error: "Something went wrong.",
         });
     }
 };
 
-
-// ==================================================
+// ========================================
 // LOGOUT
-// ==================================================
-
+// ========================================
 const logout = async (req, res) => {
-
     try {
+        const isProduction = process.env.NODE_ENV === "production";
 
-        res.clearCookie(
-            'token',
-            {
-                httpOnly: true,
-
-                secure:
-                    process.env.NODE_ENV === 'production',
-
-                sameSite:
-                    process.env.NODE_ENV === 'production'
-                        ? 'none'
-                        : 'lax'
-            }
-        );
-
+        // Cookie options must match the login cookie
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            path: "/",
+        });
 
         return res.status(200).json({
-
             success: true,
-
-            message:
-                'Logout successfully.'
+            message: "Logout successfully.",
         });
 
     } catch (error) {
-
-        console.error(
-            '========== LOGOUT ERROR =========='
-        );
-
-        console.error(
-            'Message:',
-            error.message
-        );
-
-        console.error(
-            'Stack:',
-            error.stack
-        );
-
-        console.error(
-            '=================================='
-        );
+        console.error("LOGOUT ERROR:", error.message);
 
         return res.status(500).json({
-
             success: false,
-
-            error:
-                'Something went wrong.'
+            error: "Something went wrong.",
         });
     }
 };
 
-
-// ==================================================
-// EXPORT
-// ==================================================
-
+// ========================================
+// EXPORT CONTROLLERS
+// ========================================
 module.exports = {
-
     login,
-
     me,
-
-    logout
-
+    logout,
 };

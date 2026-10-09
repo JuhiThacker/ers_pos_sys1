@@ -43,7 +43,7 @@ app.use(
 );
 
 app.use(
-    '/api/company-profile',
+    '/api/company_profile',
     companyProfileRoutes
 );
 

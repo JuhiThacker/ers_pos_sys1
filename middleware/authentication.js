@@ -1,181 +1,73 @@
-const jwt = require('jsonwebtoken');
-
-
-// ==================================================
-// AUTHENTICATION MIDDLEWARE
-// ==================================================
+const jwt = require("jsonwebtoken");
 
 const authentication = (req, res, next) => {
-
     try {
-
         let token = null;
 
+        // 1. Check Authorization header
+        const authHeader = req.headers.authorization;
 
-        // ------------------------------------------------
-        // OPTION 1: Authorization Header
-        // ------------------------------------------------
-
-        const authHeader =
-            req.headers.authorization;
-
-
-        if (authHeader) {
-
-            const parts =
-                authHeader.split(' ');
-
-
-            if (
-                parts.length === 2 &&
-                parts[0] === 'Bearer' &&
-                parts[1]
-            ) {
-
-                token = parts[1];
-
-            }
-
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.slice(7).trim();
         }
 
-
-        // ------------------------------------------------
-        // OPTION 2: HTTP-Only Cookie
-        // ------------------------------------------------
-
-        if (!token && req.cookies) {
-
+        // 2. If no Bearer token, check cookie
+        if (!token && req.cookies?.token) {
             token = req.cookies.token;
-
         }
-
-
-        // ------------------------------------------------
-        // Token Missing
-        // ------------------------------------------------
 
         if (!token) {
-
             return res.status(401).json({
-
                 success: false,
-
-                error:
-                    'Authentication token missing.'
+                error: "Authentication token missing.",
             });
         }
-
-
-        // ------------------------------------------------
-        // Check JWT Secret
-        // ------------------------------------------------
 
         if (!process.env.JWT_SECRET) {
-
-            console.error(
-                'JWT_SECRET is missing from .env'
-            );
-
             return res.status(500).json({
-
                 success: false,
-
-                error:
-                    'JWT secret is not configured.'
+                error: "JWT secret is not configured.",
             });
         }
 
+        // 3. Temporary diagnostics
+        const decoded = jwt.decode(token);
 
-        // ------------------------------------------------
-        // Verify Token
-        // ------------------------------------------------
+        console.log("Auth source:", authHeader ? "Authorization header" : "Cookie");
+        console.log(
+            "Token expires at:",
+            decoded?.exp
+                ? new Date(decoded.exp * 1000).toISOString()
+                : "Missing"
+        );
+        console.log("Current server time:", new Date().toISOString());
 
-        const decoded =
-            jwt.verify(
-                token,
-                process.env.JWT_SECRET
-            );
-
-
-        // ------------------------------------------------
-        // Store User Information
-        // ------------------------------------------------
-
-        req.user = decoded;
-
-
-        // ------------------------------------------------
-        // Continue
-        // ------------------------------------------------
+        // 4. Verify token
+        req.user = jwt.verify(token, process.env.JWT_SECRET);
 
         next();
-
-
     } catch (error) {
+        console.error("JWT Error:", error.message);
 
-        console.error(
-            'JWT Error:',
-            error.message
-        );
-
-
-        // ------------------------------------------------
-        // Expired Token
-        // ------------------------------------------------
-
-        if (
-            error.name === 'TokenExpiredError'
-        ) {
-
+        if (error.name === "TokenExpiredError") {
             return res.status(401).json({
-
                 success: false,
-
-                error:
-                    'Token expired.'
+                error: "Token expired. Please log in again.",
             });
         }
 
-
-        // ------------------------------------------------
-        // Invalid Token
-        // ------------------------------------------------
-
-        if (
-            error.name === 'JsonWebTokenError'
-        ) {
-
+        if (error.name === "JsonWebTokenError") {
             return res.status(401).json({
-
                 success: false,
-
-                error:
-                    'Invalid token.'
+                error: "Invalid token.",
             });
         }
-
-
-        // ------------------------------------------------
-        // Other Authentication Error
-        // ------------------------------------------------
 
         return res.status(401).json({
-
             success: false,
-
-            error:
-                'Authentication failed.'
+            error: "Authentication failed.",
         });
-
     }
-
 };
 
-
-// ==================================================
-// EXPORT
-// ==================================================
-
-module.exports = {
-    authentication
-};
+module.exports = { authentication };
