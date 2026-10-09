@@ -4,24 +4,29 @@ const db = require('../config/db');
 const authorize = (permissionName) => {
     return async (req, res, next) => {
         try {
-            if (!req.user || !req.user.userId) {
+            // Get the employee ID from the authenticated token.
+            const employeeId =
+                req.user?.employeeId || req.user?.userId;
+
+            if (!employeeId) {
                 return res.status(401).json({
                     success: false,
                     message: 'Authentication required.'
                 });
             }
 
+            // Check whether the employee's role has this permission.
             const [rows] = await db.execute(
                 `SELECT 1
-                 FROM users u
+                 FROM employees e
                  INNER JOIN role_permissions rp
-                    ON rp.role_id = u.role_id
+                    ON rp.role_id = e.role_id
                  INNER JOIN permissions p
                     ON p.id = rp.permission_id
-                 WHERE u.id = ?
+                 WHERE e.id = ?
                    AND p.permission_name = ?
                  LIMIT 1`,
-                [req.user.userId, permissionName]
+                [employeeId, permissionName]
             );
 
             if (rows.length === 0) {
@@ -32,6 +37,7 @@ const authorize = (permissionName) => {
             }
 
             return next();
+
         } catch (error) {
             console.error('Authorization error:', error);
 
