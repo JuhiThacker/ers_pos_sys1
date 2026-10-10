@@ -8,7 +8,9 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const companyProfileRoutes = require('./routes/companyProfileRoutes');
 const roleRoutes = require('./routes/roleRoutes');
-
+const rolePermissionRoutes =require('./routes/rolePermissionRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const shiftRoutes = require('./routes/shiftRoutes');
 const app = express();
 
 // MIDDLEWARE
@@ -41,6 +43,7 @@ app.use(
     '/api/employees',
     employeeRoutes
 );
+app.use('/api/roles', rolePermissionRoutes);
 
 app.use(
     '/api/company_profile',
@@ -48,6 +51,8 @@ app.use(
 );
 
 app.use('/api/roles', roleRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/shifts', shiftRoutes);
 
 // TEST ROUTES
 

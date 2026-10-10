@@ -1,8 +1,10 @@
+
 const express = require('express');
 
 const {
     getEmployee,
-    changePassword
+    changePassword,
+    searchEmployees
 } = require('../controller/employeeController.js');
 
 const {
@@ -13,8 +15,15 @@ const checkPermission = require('../middleware/permissionMiddleware');
 
 const router = express.Router();
 
-// CHANGE PASSWORD
+// SEARCH EMPLOYEES BY ID, EMAIL OR PHONE
+router.get(
+    '/search',
+    authentication,
+    checkPermission('employee.view'),
+    searchEmployees
+);
 
+// CHANGE PASSWORD
 router.patch(
     '/changePassword',
     authentication,
@@ -22,14 +31,12 @@ router.patch(
     changePassword
 );
 
-// GET EMPLOYEE
-
+// GET EMPLOYEE BY ID
 router.get(
     '/:id',
     authentication,
     checkPermission('employee.view'),
     getEmployee
 );
-
 
 module.exports = router;

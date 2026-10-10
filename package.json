@@ -9,6 +9,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "mysql2": "^3.24.5",
+    "nodemailer": "^10.0.16",
     "nodemon": "^1.14.10",
     "sequelize": "^6.37.8",
     "zod": "^4.6.5"

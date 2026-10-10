@@ -1,9 +1,13 @@
+
 const express = require('express');
 
 const {
     login,
     me,
-    logout
+    logout,
+    forgotPassword,
+    verifyResetOtp,
+    resetPassword
 } = require('../controller/auth/authController.js');
 
 const {
@@ -12,36 +16,22 @@ const {
 
 const router = express.Router();
 
-
-// ==================================================
 // LOGIN
-// ==================================================
+router.post('/login', login);
 
-router.post(
-    '/login',
-    login
-);
-
-
-// ==================================================
 // CURRENT EMPLOYEE
-// ==================================================
+router.get('/me', authentication, me);
 
-router.get(
-    '/me',
-    authentication,
-    me
-);
-
-
-// ==================================================
 // LOGOUT
-// ==================================================
+router.post('/logout', logout);
 
-router.post(
-    '/logout',
-    logout
-);
+// FORGOT PASSWORD - Send OTP to email
+router.post('/forgot-password', forgotPassword);
 
+// VERIFY OTP
+router.post('/verify-reset-otp', verifyResetOtp);
+
+// RESET PASSWORD
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
