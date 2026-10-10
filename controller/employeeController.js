@@ -1,6 +1,153 @@
 const pool = require('../config/db');
 const argon2 = require('argon2');
 
+
+ // CREATE EMPLOYEE
+const createEmployee = async (req, res) => {
+    try {
+        const {
+            first_name,
+            last_name,
+            username,
+            role_id,
+            employee_number,
+            password,
+            email,
+            contact_id,
+            address,
+            city,
+            district,
+            state,
+            country,
+            pincode,
+            dob,
+            joining_date
+        } = req.body;
+
+        // Validate required fields
+        if (
+            !first_name?.trim() ||
+            !last_name?.trim() ||
+            !username?.trim() ||
+            !role_id ||
+            !employee_number?.trim() ||
+            !password
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'First name, last name, username, role, employee number, and password are required.'
+            });
+        }
+
+        if (!Number.isInteger(Number(role_id)) || Number(role_id) <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'role_id must be a valid positive integer.'
+            });
+        }
+
+        // Check for existing username or employee number
+        const [existing] = await pool.execute(
+            `SELECT id
+             FROM employees
+             WHERE username = ? OR employee_number = ?
+             LIMIT 1`,
+            [username.trim(), employee_number.trim()]
+        );
+
+        if (existing.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'Username or employee number already exists.'
+            });
+        }
+
+        // Check that the selected role exists
+        const [roles] = await pool.execute(
+            'SELECT id FROM roles WHERE id = ? LIMIT 1',
+            [Number(role_id)]
+        );
+
+        if (roles.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Selected role does not exist.'
+            });
+        }
+
+        // Hash password before saving
+        const hashedPassword = await argon2.hash(password);
+
+        const [result] = await pool.execute(
+            `INSERT INTO employees (
+                first_name,
+                last_name,
+                username,
+                role_id,
+                employee_number,
+                password,
+                email,
+                contact_id,
+                address,
+                city,
+                district,
+                state,
+                country,
+                pincode,
+                dob,
+                joining_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                first_name,
+                last_name,
+                username,
+                Number(role_id),
+                employee_number,
+                hashedPassword,
+                email?.trim() || null,
+                contact_id || null,
+                address || null,
+                city || null,
+                district || null,
+                state || null,
+                country || 'India',
+                pincode || null,
+                dob || null,
+                joining_date || null
+            ]
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: 'Employee created successfully.',
+            data: {
+                id: result.insertId,
+                first_name: first_name.trim(),
+                last_name: last_name.trim(),
+                username: username.trim(),
+                role_id: Number(role_id),
+                employee_number: employee_number.trim(),
+                email: email?.trim() || null
+            }
+        });
+
+    } catch (error) {
+        console.error('Create employee error:', error);
+
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                success: false,
+                message: 'A username, employee number, or other unique value already exists.'
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to create employee.'
+        });
+    }
+};
+
 // GET ALL EMPLOYEES
 const getAllEmployees = async (req, res) => {
     try {
@@ -262,5 +409,6 @@ module.exports = {
     getAllEmployees,
     getEmployee,
     changePassword,
-    searchEmployees
+    searchEmployees,
+    createEmployee
 };

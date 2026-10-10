@@ -1,19 +1,26 @@
+
 const express = require('express');
 
 const {
     getAllEmployees,
     getEmployee,
     changePassword,
-    searchEmployees
+    searchEmployees,
+    createEmployee
 } = require('../controller/employeeController.js');
 
-const {
-    authentication
-} = require('../middleware/authentication.js');
-
-const checkPermission = require('../middleware/permissionMiddleware');
+const { authentication } = require('../middleware/authentication.js');
+const checkPermission = require('../middleware/permissionMiddleware.js');
 
 const router = express.Router();
+
+// CREATE EMPLOYEE
+router.post(
+    '/',
+    authentication,
+    checkPermission('employee.create'),
+    createEmployee
+);
 
 // GET ALL EMPLOYEES
 router.get(
