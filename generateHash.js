@@ -1,9 +1,11 @@
-
 const argon2 = require('argon2');
 
 async function generateHash() {
-    const hash = await argon2.hash('Admin@123');
-    console.log('Argon2 hash:', hash);
+    const password = 'Juhi@123'; // Replace with the actual password
+
+    const hashedPassword = await argon2.hash(password);
+
+    console.log('Argon2 Hash:', hashedPassword);
 }
 
 generateHash();

@@ -1,6 +1,49 @@
-
 const pool = require('../config/db');
 const argon2 = require('argon2');
+
+// GET ALL EMPLOYEES
+const getAllEmployees = async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT
+                e.id,
+                e.first_name,
+                e.last_name,
+                e.username,
+                r.role_name,
+                e.employee_number,
+                e.email,
+                c.phone,
+                e.address,
+                e.city,
+                e.district,
+                e.state,
+                e.country,
+                e.pincode,
+                e.dob,
+                e.joining_date
+            FROM employees e
+            LEFT JOIN roles r ON e.role_id = r.id
+            LEFT JOIN contact c ON e.contact_id = c.id
+            ORDER BY e.id DESC
+        `);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Employees retrieved successfully.',
+            count: rows.length,
+            data: rows
+        });
+
+    } catch (error) {
+        console.error('Get all employees error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve employees.'
+        });
+    }
+};
 
 // GET EMPLOYEE BY ID
 const getEmployee = async (req, res) => {
@@ -216,6 +259,7 @@ const searchEmployees = async (req, res) => {
 };
 
 module.exports = {
+    getAllEmployees,
     getEmployee,
     changePassword,
     searchEmployees

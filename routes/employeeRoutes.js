@@ -1,7 +1,7 @@
-
 const express = require('express');
 
 const {
+    getAllEmployees,
     getEmployee,
     changePassword,
     searchEmployees
@@ -14,6 +14,14 @@ const {
 const checkPermission = require('../middleware/permissionMiddleware');
 
 const router = express.Router();
+
+// GET ALL EMPLOYEES
+router.get(
+    '/',
+    authentication,
+    checkPermission('employee.view'),
+    getAllEmployees
+);
 
 // SEARCH EMPLOYEES BY ID, EMAIL OR PHONE
 router.get(
