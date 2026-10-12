@@ -3,6 +3,8 @@ const express = require('express');
 
 const {
     getAllEmployees,
+    updateEmployee,
+    deleteEmployee,
     getEmployee,
     changePassword,
     searchEmployees,
@@ -20,6 +22,21 @@ router.post(
     authentication,
     checkPermission('employee.create'),
     createEmployee
+);
+
+// Update employee
+router.put(
+    '/:id',
+    authentication,
+    checkPermission('employee.edit'),
+    updateEmployee
+);
+//Delete Employee
+router.delete(
+    '/:id',
+    authentication,
+    checkPermission('employee.delete'),
+    deleteEmployee
 );
 
 // GET ALL EMPLOYEES
