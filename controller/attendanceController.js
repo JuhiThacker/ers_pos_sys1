@@ -1,5 +1,4 @@
 const db = require('../config/db');
-
 function dateString(value) {
     if (typeof value === 'string') return value.slice(0, 10);
     return null;
@@ -375,55 +374,71 @@ const checkOut = async (req, res) => {
     }
 };
 
+// GET MY ATTENDANCE
 const getMyAttendance = async (req, res) => {
     try {
-        const employeeId = req.user.employeeId;
-        const { from, to } = req.query;
+        const employeeId = Number(req.user?.employeeId);
 
-        if ((from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) ||
-            (to && !/^\d{4}-\d{2}-\d{2}$/.test(to))) {
-            return res.status(400).json({
+        if (!employeeId) {
+            return res.status(401).json({
                 success: false,
-                message: 'Dates must use YYYY-MM-DD format.'
+                message: 'Authentication required.'
             });
         }
 
-        const filters = ['a.employee_id = ?'];
-        const params = [employeeId];
-
-        if (from) {
-            filters.push('a.attendance_date >= ?');
-            params.push(from);
-        }
-
-        if (to) {
-            filters.push('a.attendance_date <= ?');
-            params.push(to);
-        }
-
-        const [rows] = await db.execute(
-            `SELECT a.id, a.attendance_date, a.status,
-                    a.check_in, a.check_out,
-                    a.scheduled_start, a.scheduled_end,
-                    a.scheduled_minutes, a.break_minutes,
-                    a.worked_minutes, a.overtime_minutes,
-                    s.shift_name, s.shift_code
-             FROM attendance a
-             LEFT JOIN shifts s ON s.id = a.shift_id
-             WHERE ${filters.join(' AND ')}
-             ORDER BY a.attendance_date DESC`,
-            params
+        // Get the employee's login/logout sessions
+        const [sessions] = await db.execute(
+            `SELECT
+                id,
+                login_time,
+                logout_time,
+                status,
+                ip_address,
+                last_seen_at,
+                created_at
+             FROM attendance_sessions
+             WHERE employee_id = ?
+             ORDER BY login_time DESC
+             LIMIT 30`,
+            [employeeId]
         );
 
-        return res.json({ success: true, data: rows });
+        // Get breaks associated with the employee's sessions
+        const [breaks] = await db.execute(
+    `SELECT
+        b.id,
+        b.session_id,
+        b.break_type,
+        b.break_start,
+        b.break_end
+     FROM attendance_breaks b
+     INNER JOIN attendance_sessions s
+        ON s.id = b.session_id
+     WHERE s.employee_id = ?
+     ORDER BY b.break_start DESC
+     LIMIT 100`,
+    [employeeId]
+);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Attendance retrieved successfully.',
+            data: {
+                sessions,
+                breaks
+            }
+        });
+
     } catch (error) {
         console.error('Get my attendance error:', error);
+
         return res.status(500).json({
             success: false,
             message: 'Unable to retrieve attendance.'
         });
     }
 };
+
 
 const getAttendanceReport = async (req, res) => {
     try {
@@ -494,9 +509,182 @@ const getAttendanceReport = async (req, res) => {
     }
 };
 
+// START BREAK
+const startBreak = async (req, res) => {
+    try {
+        const employeeId = req.user?.employeeId;
+        const { break_type } = req.body;
+
+        if (!employeeId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required.'
+            });
+        }
+
+        const allowedTypes = ['lunch', 'tea', 'personal', 'other'];
+
+        if (!allowedTypes.includes(break_type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid break type.'
+            });
+        }
+
+        const [sessions] = await db.execute(
+            `SELECT id
+             FROM attendance_sessions
+             WHERE employee_id = ?
+               AND status = 'active'
+               AND logout_time IS NULL
+             ORDER BY login_time DESC
+             LIMIT 1`,
+            [employeeId]
+        );
+
+        if (sessions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No active attendance session. Please check in first.'
+            });
+        }
+
+        const sessionId = sessions[0].id;
+
+        const [existingBreaks] = await db.execute(
+            `SELECT id
+             FROM attendance_breaks
+             WHERE session_id = ?
+               AND break_end IS NULL
+             LIMIT 1`,
+            [sessionId]
+        );
+
+        if (existingBreaks.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'A break is already in progress.'
+            });
+        }
+
+        const [result] = await db.execute(
+            `INSERT INTO attendance_breaks
+                (session_id, break_type, break_start)
+             VALUES (?, ?, NOW())`,
+            [sessionId, break_type]
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: 'Break started successfully.',
+            data: {
+                id: result.insertId,
+                session_id: sessionId,
+                break_type
+            }
+        });
+
+    } catch (error) {
+        console.error('Start break error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to start break.'
+        });
+    }
+};
+
+
+// END BREAK
+const endBreak = async (req, res) => {
+    try {
+        const employeeId = req.user?.employeeId;
+
+        if (!employeeId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required.'
+            });
+        }
+
+        const [sessions] = await db.execute(
+            `SELECT id
+             FROM attendance_sessions
+             WHERE employee_id = ?
+               AND status = 'active'
+               AND logout_time IS NULL
+             ORDER BY login_time DESC
+             LIMIT 1`,
+            [employeeId]
+        );
+
+        if (sessions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No active attendance session found.'
+            });
+        }
+
+        const sessionId = sessions[0].id;
+
+        const [breaks] = await db.execute(
+            `SELECT id, break_type, break_start
+             FROM attendance_breaks
+             WHERE session_id = ?
+               AND break_end IS NULL
+             ORDER BY break_start DESC
+             LIMIT 1`,
+            [sessionId]
+        );
+
+        if (breaks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No active break found.'
+            });
+        }
+
+        const [result] = await db.execute(
+            `UPDATE attendance_breaks
+             SET break_end = NOW()
+             WHERE id = ?
+               AND break_end IS NULL`,
+            [breaks[0].id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'The break has already ended.'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Break ended successfully.',
+            data: {
+                id: breaks[0].id,
+                break_type: breaks[0].break_type,
+                break_start: breaks[0].break_start
+            }
+        });
+
+    } catch (error) {
+        console.error('End break error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to end break.'
+        });
+    }
+};
+
+
 module.exports = {
     checkIn,
     checkOut,
     getMyAttendance,
-    getAttendanceReport
+    getAttendanceReport,
+    startBreak,
+    endBreak
 };

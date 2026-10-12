@@ -1,0 +1,18 @@
+$kind: http-request
+name: ""
+url: http://192.168.1.211:3000/api/employees/profileImage/5
+method: GET
+body:
+  type: json
+  content: "{\r
+
+    \    \"username\":\"sakshi123\",\r
+
+    \    \"password\":\"Admin@123\"\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: ""
+order: 1000

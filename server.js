@@ -8,13 +8,13 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const companyProfileRoutes = require('./routes/companyProfileRoutes');
 const roleRoutes = require('./routes/roleRoutes');
-const rolePermissionRoutes =require('./routes/rolePermissionRoutes');
+const rolePermissionRoutes = require('./routes/rolePermissionRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
+
 const app = express();
 
 // MIDDLEWARE
-
 app.use(
     cors({
         origin: true,
@@ -23,39 +23,27 @@ app.use(
 );
 
 app.use(express.json());
-
-app.use(
-    express.urlencoded({
-        extended: true
-    })
-);
-
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // ROUTES
+app.use('/api/auth', authRoutes);
+app.use('/api/employees', employeeRoutes);
 
-app.use(
-    '/api/auth',
-    authRoutes
-);
-
-app.use(
-    '/api/employees',
-    employeeRoutes
-);
+// Role and permission routes
 app.use('/api/roles', rolePermissionRoutes);
-
-app.use(
-    '/api/company_profile',
-    companyProfileRoutes
-);
-
 app.use('/api/roles', roleRoutes);
+
+// Company profile
+app.use('/api/company_profile', companyProfileRoutes);
+
+// Attendance
 app.use('/api/attendance', attendanceRoutes);
+
+// Shifts
 app.use('/api/shifts', shiftRoutes);
 
 // TEST ROUTES
-
 app.get('/', (req, res) => {
     res.json({
         success: true,
@@ -77,44 +65,27 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-
-// 404
-
+// 404 HANDLER
 app.use((req, res) => {
-
     res.status(404).json({
         success: false,
         error: `Route ${req.method} ${req.originalUrl} not found.`
     });
-
 });
 
 // ERROR HANDLER
-
 app.use((err, req, res, next) => {
-
     console.error('Server Error:', err);
 
     res.status(500).json({
         success: false,
         error: 'Internal server error.'
     });
-
 });
 
 // START SERVER
-
 const PORT = process.env.PORT || 3000;
 
-app.listen(
-    PORT,
-    '0.0.0.0',
-    () => {
-
-        console.log(
-            `Server running at http://localhost:${PORT}`
-        );
-
-    }
-);
-
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
