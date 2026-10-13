@@ -2,31 +2,72 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Folder for employee profile images
+const UPLOAD_DIR = path.join(
+    __dirname,
+    '../uploads/employees'
+);
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (req, file, cb) =>
-      cb(null, `avatar-${req.user.userId}-${Date.now()}${path.extname(file.originalname).toLowerCase()}`),
-  }),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
-  fileFilter: (req, file, cb) => {
-    if (/^image\/(png|jpe?g|gif|webp)$/.test(file.mimetype)) cb(null, true);
-    else cb(new Error('Only PNG, JPG, GIF or WEBP images are allowed.'));
-  },
-}).single('image');
+// Create folder automatically if it does not exist
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
-// Use AFTER authentication so req.user is available for the file name
-const handleImageUpload = (req, res, next) => {
-  upload(req, res, (err) => {
-    if (err) {
-      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Image must be 2 MB or smaller.' : err.message;
-      return res.status(400).json({ error: msg });
+// Configure file storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, UPLOAD_DIR);
+    },
+
+    filename: (req, file, cb) => {
+        const extension = path.extname(file.originalname).toLowerCase();
+        const filename = `employee-${Date.now()}${extension}`;
+
+        cb(null, filename);
     }
-    next();
-  });
+});
+
+// Allow image files only
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif'
+    ];
+
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only JPG, PNG, WEBP, and GIF images are allowed.'));
+    }
 };
 
-module.exports = { handleImageUpload, UPLOAD_DIR };
+// Configure Multer
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 50 * 1024  
+    }
+});
+
+// Middleware for a single employee profile image
+const handleImageUpload = (req, res, next) => {
+    upload.single('profile_image')(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({
+                success: false,
+                message: err.message
+            });
+        }
+
+        next();
+    });
+};
+
+module.exports = {
+    upload,
+    handleImageUpload,
+    UPLOAD_DIR
+};

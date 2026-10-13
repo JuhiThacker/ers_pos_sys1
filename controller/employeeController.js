@@ -458,7 +458,163 @@ const updateEmployee = async (req, res) => {
         });
     }
 };
+//Get employee profile image 
+const getProfileImage = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const [rows] = await pool.query(`SELECT profile_image FROM employees WHERE id=?`, [id]);
+        if (!rows.length || !rows[0].profile_image) {
+            return res.status(404).json({
+                error: "Profile image not found"
+            });
+        }
+        const filePath = path.join(
+            process.cwd(),
+            "src",
+            rows[0].profile_image
+        );
+        res.sendFile(filePath);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
 
+//Insert new employee with profile image
+const addEmployee = async (req, res) => {
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        const incomingData = { ...req.body };
+        const employeeValidation = employeeValidator.safeParse(incomingData);
+        if (!employeeValidation.success) {
+            const errors = employeeValidation.error.issues.map(err => err.message);
+            return res.status(400).json({ errors });
+        }
+        const {
+            franchise_id,
+            first_name,
+            last_name,
+            username,
+            role_id,
+            password,
+            email,
+            address,
+            city,
+            district,
+            state,
+            country,
+            pincode,
+            dob,
+            gender,
+            joining_date
+        } = employeeValidation.data;
+
+        const profile_image = req.file ? `upload/${req.file.filename}` : null;
+
+        const hashedPassword = await argon2.hash(password);
+
+        //get franchise code
+        const [franchiseRows] = await connection.query(`SELECT franchise_code FROM franchises WHERE id = ?`,
+            [franchise_id]
+        );
+        const franchiseCode = franchiseRows[0].franchise_code;
+
+        //get last employee of that franchise
+        const [employeeRows] = await connection.query(`SELECT employee_number FROM employees WHERE franchise_id = ? ORDER BY id DESC LIMIT 1`,
+            [franchise_id]
+        );
+
+        //generate employee number
+        let employee_number;
+        if (employeeRows.length === 0) {
+            employee_number = `${franchiseCode}-EMP0001`;
+        } else {
+            const lastNumber = employeeRows[0].employee_number;
+            const sequence = parseInt(lastNumber.split("EMP")[1]);
+
+            employee_number = `${franchiseCode}-EMP${String(sequence + 1).padStart(4, 0)}`;
+        }
+
+
+        const contactValidation = contactValidator.safeParse(incomingData);
+        if (!contactValidation.success) {
+            const errors = contactValidation.error.issues.map(err => err.message);
+            return res.status(400).json({ errors });
+        }
+
+        const { phone, owner_id,is_primary,status_id } = contactValidation.data;
+
+        const sql = `INSERT INTO employees (
+            franchise_id,
+            first_name,
+            last_name,
+            username,
+            role_id,
+            employee_number,
+            password,
+            email,
+            address,
+            city,
+            district,
+            state,
+            country,
+            pincode,
+            dob,
+            gender,
+            joining_date,
+            profile_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        const [employeeResult] = await connection.query(sql, [
+            franchise_id,
+            first_name,
+            last_name,
+            username,
+            role_id,
+            employee_number,
+            hashedPassword,
+            email,
+            address,
+            city,
+            district,
+            state,
+            country,
+            pincode,
+            dob ?? null,
+            gender,
+            joining_date,
+            profile_image ?? null
+        ]);
+        const employeeId = employeeResult.insertId;
+
+        await connection.query(`INSERT INTO contacts (contact_type, owner_id, is_primary, phone, status_id) 
+            VALUES (?, ?, ?, ?, ?)`, [
+            "Employee",
+            employeeId,
+            is_primary,
+            phone,
+            status_id
+        ]);
+
+        await connection.commit();
+        return res.status(201).json({ message: 'Record inserted successfully.' });
+    }
+    catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+
+        return res.status(500).json({
+            error: error.message
+        });
+    }
+    finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
 
 // ========================================
 // GET ALL EMPLOYEES
@@ -852,6 +1008,7 @@ const searchEmployees = async (req, res) => {
 module.exports = {
     createEmployee,
     getAllEmployees,
+    getProfileImage,
     updateEmployee,
     deleteEmployee,
     getEmployee,
